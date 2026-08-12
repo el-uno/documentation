@@ -1,0 +1,97 @@
+---
+title: "Arc interview prep: payments and fintech questions"
+sidebarTitle: "Overview"
+description: "Four question banks and two self-check quizzes for payments, ledger, and infrastructure interviews — every answer grounded in Arc's implementation."
+---
+
+Four question banks and two quizzes cover the domains Arc actually implements: double-entry ledgers, distributed sagas, blockchain settlement, and financial compliance. Every answer links back to a concrete page on this site, so any question you cannot answer points you to exactly where to go next.
+
+<Warning>
+  **Answer out loud before opening each accordion.** Recognising a correct answer and producing one are different skills, and only the second is tested in an interview. Reading answers straight through feels productive and teaches almost nothing.
+</Warning>
+
+## Prerequisites
+
+Two pages should be in your head before the question banks are useful. Everything else builds on them.
+
+<CardGroup cols={2}>
+  <Card title="The Ledger" icon="scale-balanced" href="/architecture/ledger">
+    Chart of accounts, the balance rule per currency, derived balances, and append-only entries.
+  </Card>
+  <Card title="The Settlement Saga" icon="rotate-left" href="/architecture/settlement-saga">
+    Five steps, five compensations, reverse-order unwind, and why order matters for non-arithmetic reasons.
+  </Card>
+</CardGroup>
+
+## The question banks
+
+<CardGroup cols={2}>
+  <Card title="Ledger and money" icon="coins" href="/practice/ledger">
+    Double-entry from first principles, why balances are derived, multi-currency journals, rounding residuals, and the invariant with no tolerance.
+  </Card>
+  <Card title="Distributed systems" icon="network-wired" href="/practice/distributed-systems">
+    Sagas versus two-phase commit, the transactional outbox, idempotency, at-least-once delivery, and compensation ordering.
+  </Card>
+  <Card title="Chain and settlement" icon="link" href="/practice/chain-and-settlement">
+    Finality as probability, block time versus settlement window, reorgs, failed versus dropped, and chain selection.
+  </Card>
+  <Card title="Risk and compliance" icon="shield" href="/practice/compliance">
+    Tiering, fuzzy name matching, the five AML rule families, four-eyes approval, and why compliance blocks rather than observes.
+  </Card>
+</CardGroup>
+
+## The quizzes
+
+<CardGroup cols={2}>
+  <Card title="Ledger quiz" icon="circle-question" href="/practice/quiz-ledger">
+    Twelve questions. Several have a plausible wrong answer that is the actual point.
+  </Card>
+  <Card title="Settlement quiz" icon="circle-question" href="/practice/quiz-settlement">
+    Twelve questions on the saga, rails, chains and compensation.
+  </Card>
+</CardGroup>
+
+## How interviews grade these answers
+
+Interview answers in payments and infrastructure fall into three bands. Knowing which band you are producing matters more than knowing more facts.
+
+| Band | Sounds like | Why it lands there |
+| --- | --- | --- |
+| **Junior** | "Debits equal credits." | Correct, memorised, no model behind it. Cannot handle a follow-up. |
+| **Senior** | "Debits equal credits per currency, because offsetting a EUR debit against a USDC credit adds quantities of different things." | A model that generates the rule rather than recites it. |
+| **Staff** | "…and that is why an FX conversion cannot be a two-legged journal. It needs position accounts to close each half — which is also where unhedged exposure becomes visible, so the constraint bought a reporting capability." | Connects the constraint to a consequence elsewhere in the system. |
+
+<Note>
+  The move from senior to staff is almost always the same: **name what the constraint costs, and what it bought.** An answer that only lists benefits reads as something learned rather than something lived.
+</Note>
+
+## Use the stories
+
+A concrete failure narrative beats an abstract answer in every interview, because it demonstrates the judgement instead of asserting it. Compare these two responses to "how do you verify your test suite is meaningful?":
+
+<Tabs>
+  <Tab title="Assertion">
+    "We use mutation testing to make sure our tests are meaningful."
+
+    True. Unremarkable. Every candidate says a version of this.
+  </Tab>
+  <Tab title="Demonstration">
+    "We reversed the compensation order deliberately and all sixteen tests passed — because reversals commute, so balance can't see ordering. We added two tests asserting order and account pairing."
+
+    Now the interviewer knows you have actually thought about what your tests cannot see.
+  </Tab>
+</Tabs>
+
+[The seven stories](/stories) are written to be retold. The strongest ones are about what *did not* work — the mutation that passed, the boundary rule that silently did not apply.
+
+## A note on honesty
+
+<Warning>
+  Arc is a simulation, and saying so is an advantage rather than a weakness. "I built a system that models chain reorgs deterministically so the chaos suite can inject one at a precise block" is a strong claim. Implying you ran production payment infrastructure is a claim that collapses under one follow-up question.
+
+  The interesting engineering here is real. The traffic is not. Say both.
+</Warning>
+
+<Card title="Start with the ledger bank" icon="arrow-right" href="/practice/ledger">
+  Twelve questions, worked answers, and the follow-ups interviewers actually ask.
+</Card>

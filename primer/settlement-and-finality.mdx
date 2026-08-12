@@ -1,0 +1,101 @@
+---
+title: "Settlement and Finality: Why the Fastest Chain Settles Last"
+sidebarTitle: "Finality"
+description: "Why 'instant' is a marketing word, why the fastest chain can settle last, and how a payments business picks a point on the finality probability curve."
+---
+
+"Settles in seconds" is the claim the entire sector is sold on. It is true in the way that "the plane lands in six hours" is true — accurate about the flight, silent about the airport. Before you can act on any speed claim, you need to pull apart two concepts that the industry routinely collapses into one: **settlement** and **finality**. Getting this wrong is not an academic problem. It is the difference between crediting a customer on a confirmed payment and crediting them on one that is about to be reorganised out of the chain.
+
+---
+
+## Settlement is not finality
+
+<CardGroup cols={2}>
+  <Card title="Settlement" icon="handshake">
+    The discharge of an obligation. You owed me money; now you do not. In a traditional system this is the moment a central bank's books are updated.
+  </Card>
+  <Card title="Finality" icon="lock">
+    The point after which that discharge **cannot be undone**. It is a legal concept before it is a technical one, and the two do not always agree on timing.
+  </Card>
+</CardGroup>
+
+In a traditional RTGS system — TARGET2, Fedwire — finality is **deterministic and legally defined**. A payment settles at a specific instant, statute says it is irrevocable, and that is the end of it. There is no probability involved.
+
+On a public blockchain, finality is **probabilistic**. A transaction included in a block might be reorganised out of the chain if a competing fork wins. The probability of that decays as blocks accumulate on top, approaching but never quite reaching zero.
+
+**A payments business does not "wait for finality." It chooses a confirmation depth** at which the residual reorg probability is acceptable relative to the value at risk — and that choice is a business decision priced into the product, not a technical constant.
+
+Ethereum's move to proof-of-stake introduced _economic_ finality via checkpointing, which is stronger: reverting a finalised checkpoint requires an attacker to burn a large fraction of staked ETH. It is still not a statute. It is a very expensive disincentive, which is a different kind of guarantee than TARGET2 offers, and worth being precise about when someone claims the two are equivalent.
+
+---
+
+## The counter-intuitive part: block time is not speed
+
+Here is the table that makes the point most clearly.
+
+| Chain | Block time | Confirmations to finality | Actual settlement window |
+|---|---|---|---|
+| Solana | 400 ms | 32 | ~13 s |
+| Base | 2 s | 10 | 20 s |
+| Tron | 3 s | 19 | 57 s |
+| Ethereum | 12 s | 12 | 144 s |
+| Polygon | 2 s | 128 | **256 s** |
+
+**Polygon has blocks six times faster than Ethereum and settles nearly twice as slowly.** Fast blocks that are individually less secure require more of them to reach the same confidence level. Optimising for block time alone gets this exactly backwards — you end up with a chain that feels fast and commits slowly.
+
+<Note>
+Arc models each of these five chains with its own block time, finality depth, fee model, reorg depth distribution, and failure rates — and then selects a chain per transfer by scoring settlement time against fee, weighted by a speed preference. That is what "chain-agnostic" means concretely: the corridor picks per transfer rather than being wired to one chain.
+</Note>
+
+---
+
+## Failed is not the same as dropped
+
+A distinction that looks pedantic until you have to compensate for it in your ledger.
+
+<CardGroup cols={2}>
+  <Card title="Failed" icon="xmark">
+    The transaction was mined into a block, executed, and reverted. It consumed gas. The fee is spent and gone — it is a real expense, even though nothing moved.
+  </Card>
+  <Card title="Dropped" icon="trash">
+    The transaction never made it into a block — evicted from the mempool, underpriced, or replaced. It cost nothing, and you can retry it freely.
+  </Card>
+</CardGroup>
+
+These two outcomes require different compensation. Reversing a failed transaction must **not** reverse the gas expense, because the gas was really spent. Pretending otherwise misstates the expense and produces a balanced ledger that lies about reality. Arc treats the network fee for a failed transaction as a real cost — it is recorded and retained, not unwound.
+
+Arc's chain simulator models failed and dropped as distinct terminal states, precisely so the settlement flow has to handle them differently rather than collapsing both into a generic error path.
+
+---
+
+## Reorgs are not hypothetical
+
+A reorganisation happens when the chain discards blocks it had previously built on and adopts a competing branch. Transactions in the discarded blocks return to the mempool — they are *un-mined*, and a transaction you had counted as included is suddenly pending again. For a payments business, this is the nastiest failure mode available, because it is the one where **you already told the customer it worked**.
+
+Arc's simulator produces reorgs both probabilistically (each chain has a configured reorg rate and maximum depth, producing statistically realistic failure sequences) and deterministically on demand for testing edge cases at precise moments. Rollback clears each affected transaction's block height, resets its status to pending, and re-queues it for inclusion — so the saga handles reorgs as a recoverable state rather than an error.
+
+---
+
+## The three honest shapes of a customer promise
+
+A corridor product has to make a promise about time, and there are only three honest forms that promise can take.
+
+| Promise | What it requires | Cost |
+|---|---|---|
+| "Funds arrive when the chain finalises" | Nothing. Pass the latency through | Slowest, cheapest, hardest to sell |
+| "Funds arrive in ~20s, we pick the chain" | Chain selection per transfer, accepting that the cheapest chain is often not the fastest | Moderate |
+| "Funds arrive instantly, we credit before finality" | The provider takes reorg risk onto its own balance sheet | Fastest — and it is a **credit product** whether or not it is called one |
+
+The third option is what most consumer-facing "instant" products actually are, and it deserves to be named. Crediting a beneficiary before finality means the provider is lending against an unsettled position. That can be perfectly sound — priced, bounded, reserved against — but it is a lending decision, and a system that does not model it as one will eventually be surprised by it.
+
+<Note>
+Arc takes the second shape. The settlement step broadcasts to the chain, then **re-reads the transaction and requires confirmed finality** before proceeding. Checking confirmed finality rather than "no error was thrown" is the difference between confirming settlement and merely confirming submission — and it is a distinction that is easy to get wrong in code that looks correct.
+</Note>
+
+<Card title="Next: the 2026 regulatory picture" icon="gavel" href="/primer/regulation">
+  GENIUS Act rulemaking, MiCA's transitional cliff, Kenya's VASP Act, and Nigeria's ISA 2025.
+</Card>
+
+---
+
+*Chain characteristics above are Arc's simulation parameters, chosen to reflect published finality guidance for each network at the time of writing. See [the bibliography](/primer/bibliography) for references.*

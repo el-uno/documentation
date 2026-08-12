@@ -1,0 +1,101 @@
+---
+title: "Arc: What It Models, What It Fakes, and Why It Matters"
+sidebarTitle: "What Arc Is"
+description: "Arc simulates a cross-border payments business. Learn what it models faithfully, what it deliberately fakes, and why that distinction matters."
+icon: "circle-info"
+---
+
+Arc is a **simulation of a cross-border payments business**, written to be read as much as run. It models a company that moves money between Europe and Africa: it holds customer balances in several currencies, converts them, settles the middle leg on a blockchain, and pays out over local rails such as SEPA Instant, NIP, and M-Pesa. The word "simulation" is load-bearing — Arc is not a wallet, not a demo app with a `balance` column, and not a toy. Understanding the distinction is the single most important thing you can do before reading anything else on this site.
+
+## Demo vs. simulation: the core distinction
+
+The difference between a demo and a simulation comes down to how a balance is stored.
+
+**A demo stores a balance directly.**
+
+```sql
+UPDATE accounts SET balance = balance - 1000;
+```
+
+This is fast to write. It is also impossible to audit properly. When the number is wrong there is nothing to compare it against, because the number *is* the record. You cannot replay it, reconstruct it, or prove it has never been tampered with.
+
+**Arc derives the balance instead.**
+
+A balance is a fold over an append-only entry log. Replay the log and you must get the same figure. If you don't, the entries are the ground truth and the cached number is wrong — not the other way around. That single architectural choice cascades through everything else on this site.
+
+## What is modelled faithfully
+
+These properties are simulated, but simulated *properly*. The behaviour that makes each one hard in production is present in Arc — not smoothed away.
+
+<AccordionGroup>
+  <Accordion title="Double-entry accounting, enforced twice" icon="scale-balanced">
+    Every movement is a balanced set of entries. Debits equal credits **exactly**, per currency, independently. The posting engine validates the balance before writing, and the Postgres schema validates it again via a `DEFERRABLE INITIALLY DEFERRED` constraint trigger. A transaction that leaves any journal unbalanced cannot commit — not from the application, and not from raw SQL at 3 am during an incident.
+
+    [The ledger →](/architecture/ledger)
+  </Accordion>
+
+  <Accordion title="Chain behaviour that actually differs by chain" icon="link">
+    Arc simulates five chains with genuinely different physics. Solana runs 400 ms blocks with 32-confirmation finality; Polygon runs 2-second blocks but requires 128 confirmations. Polygon therefore settles *slowest* despite appearing fastest — exactly the mistake a naive "block time equals speed" model makes. Seeded runs reproduce the same blocks, reorgs, and outcomes every time, so tests are deterministic.
+
+    [The chain layer →](/architecture/chain-layer)
+  </Accordion>
+
+  <Accordion title="Rails with cut-offs, caps, and asymmetric failure" icon="building-columns">
+    Six rails, each with its own latency profile, cut-off window, transaction cap, and failure characteristics. NIP carries the highest rejection rate; M-Pesa carries the highest timeout rate. Missing SEPA Credit's 15:00 cut-off by an hour costs a full calendar day, not an hour — the queued payment starts from the next opening window and then takes the rail's normal processing time on top.
+
+    [The cut-off that cost a day →](/stories/the-cutoff-that-cost-a-day)
+  </Accordion>
+
+  <Accordion title="A saga with a compensating action for every step" icon="rotate-left">
+    The settlement flow is: Quote → Compliance → Reserve → Swap → Settle → Payout. Each step has an `execute` and a `compensate`, and compensation walks completed steps *backwards* in order. A failure at any step is a business outcome with a status and a compensated ledger — not an exception thrown at the caller and a balance left in limbo.
+
+    [The settlement saga →](/architecture/settlement-saga)
+  </Accordion>
+
+  <Accordion title="At-least-once delivery, effectively-once processing" icon="inbox">
+    A transactional outbox stages events in the same database transaction as the state change, so an event is never lost even if the process crashes immediately after writing. Handlers that already succeeded are never re-run on retry. A poison event is parked for human review rather than dropped or left blocking the queue.
+
+    [Contexts and events →](/architecture/contexts-and-events)
+  </Accordion>
+</AccordionGroup>
+
+## What is simulated away
+
+The following table states Arc's seams plainly, because a simulation that hides them teaches the wrong things.
+
+| Not real | What stands in for it |
+|---|---|
+| Blockchains | A deterministic in-process simulator with per-chain block time, finality depth, fee model, seeded reorgs, and stuck or dropped transaction behaviour |
+| Bank rails | Per-rail adapters injecting realistic latency, cut-off windows, transaction caps, and failure codes |
+| Sanctions data | A synthetic list — invented names, invented programmes, no correspondence to any real person or programme |
+| FX rates | A static rate provider with exact inversion |
+| Network partitions | Not experienced. Contexts are in-process, so partial-availability failures are modelled rather than lived |
+| Key management | No HSM, no KMS, no PCI scope |
+| Licensing | None. Arc is not authorised to do anything, anywhere |
+
+<Warning>
+  Because Arc runs as a modular monolith, it never suffers a true network partition between contexts. Sagas, idempotency, and at-least-once delivery are genuine — the outbox is a real table with real retry semantics — but split-brain and partial-availability failure modes are reasoned about rather than reproduced in a running system. That trade-off is argued in [ADR 0002](/decisions/0002-modular-monolith).
+</Warning>
+
+## Who this is for
+
+Different audiences get different things out of Arc. Find yours below, then read accordingly.
+
+**Engineers new to financial software** get an answer to why financial systems look so different from ordinary CRUD. The answer is mostly: because you can never delete anything, and the arithmetic must be exact at every boundary.
+
+**Engineers with a fintech background** get a worked reference for the saga pattern, a complete chart of accounts, and a detailed treatment of compensation ordering — the part most real codebases get wrong under pressure.
+
+**Product and policy people** who need to evaluate a stablecoin payments claim without taking the vendor's word for it should start with [the case against](/primer/the-case-against) — it is the page most such sites do not have.
+
+**Anyone preparing for an interview** in a payments, ledger, or infrastructure role will find [the practice section](/practice) built for exactly that purpose, including question banks with worked answers and self-check quizzes.
+
+## The non-goals, one more time
+
+- **Not a real financial system.** Every external integration is a simulator — no real money moves.
+- **Not production-hardened.** No HSM, no real KMS, no PCI scope, and no regulatory licensing of any kind.
+- **Not compliance software.** The AML rules and sanctions screening illustrate how such systems are *structured*. They are not a compliance programme and must never be used as one.
+- **Not investment, legal, or financial advice.**
+
+<Card title="Next: pick a reading path" icon="compass" href="/start/reading-paths">
+  Four routes through this site depending on what you came for — domain understanding, code, stories, or interview prep.
+</Card>

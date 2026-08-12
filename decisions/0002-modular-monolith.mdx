@@ -1,0 +1,95 @@
+---
+title: "ADR 0002: Modular monolith over microservices, enforced"
+sidebarTitle: "ADR 0002"
+description: "One deployable, six bounded contexts, boundaries enforced by CI. The interesting distributed-system problems are genuine; the setup overhead is not."
+---
+
+Arc models roughly thirty services across six domains. It is also a **public showcase repository** — someone who clones it should reach a working corridor transfer in minutes, not after thirty minutes of container orchestration. Those two goals pull against each other, and this record captures how the tension was resolved and what was given up to resolve it.
+
+<Info>
+**Status:** Accepted · **Phase:** 0 · **Supersedes:** none · **Superseded by:** none
+</Info>
+
+## Context
+
+The interesting parts of Arc are the distributed-system concerns: sagas, compensating actions, at-least-once delivery, idempotency under failure. A saga is only genuinely a saga when there is no shared database transaction to fall back on. These problems are worth demonstrating with real implementations, not simulated with in-memory stubs.
+
+At the same time, a repository whose main job is to be read and run by strangers cannot open with a page of infrastructure setup. Setup friction is the practical difference between a repository being read and a repository being starred and closed.
+
+The question was whether the interesting properties could be preserved without the operational cost — and specifically, whether "modular" could be made a checked claim rather than a label that erodes on contact with the first deadline.
+
+## Decision
+
+**One deployable. Six bounded contexts under `services/`, communicating only through the event catalogue in `@arc/contracts` or by publishing on the in-process event bus. No context imports another context's code.**
+
+`dependency-cruiser` enforces this in CI. A cross-context relative import fails the build.
+
+<Note>
+**The enforcement is the decision.** A modular monolith whose boundaries are documented rather than checked is a monolith with aspirations — and it becomes a plain monolith the first time someone is in a hurry and the path of least resistance is a direct import. The check removes that path.
+</Note>
+
+Synchronous cross-context calls, where they are genuinely required, use **dependency inversion**: the calling context defines a port interface it owns, the other context provides an implementation, and the adapter lives at the composition root — outside every context's `src` directory. Movement's `LedgerPort` is the worked example: Movement defines the interface, Ledger implements it, and the wiring happens at startup, not at import time.
+
+## Consequences
+
+### What this makes easy
+
+- **`pnpm install && pnpm dev` is the complete setup.** No orchestration, no service discovery, no per-service environment files. A contributor is running a corridor transfer within minutes of cloning.
+- **Contexts stay independently extractable.** Because the boundary is mechanically checked rather than merely intended, pulling `movement` into its own deployable is a wiring change at the composition root, not an archaeology project through interleaved dependencies.
+- **The transactional outbox gives real at-least-once semantics.** The saga and idempotency work is genuine, not simulated away by shared transactions. This is the crux: the distributed-systems concerns survive the topology choice.
+- **A full corridor test runs in milliseconds.** One test process can exercise the real ledger, the real chain simulator, and a real rail adapter without any network or container overhead.
+
+### Costs and gaps
+
+<Warning>
+- **No true network partition between contexts.** Failure modes involving partial network availability are modelled rather than experienced. Split-brain scenarios, slow-but-not-dead dependencies, and asymmetric partitions are reasoned about, not reproduced. This is the largest and most honest cost of the decision.
+- **Everything scales together.** There is no independent scaling of settlement workers versus the compliance screener. A traffic spike in one context is a resource event for all of them.
+- **The event bus is in-process.** Durable, via the outbox table, but not a broker — so backpressure, consumer groups, and partition rebalancing are absent from the real implementation.
+- **Shared blast radius.** An unhandled failure in one context can take the entire deployable down, which independent deployment would contain.
+</Warning>
+
+## Alternatives
+
+<AccordionGroup>
+  <Accordion title="True microservices with Docker Compose — rejected" icon="network-wired">
+    The most realistic option, and the most impressive in architecture diagrams. Real network calls, real partial failures, real independent deployment, real container-level isolation.
+
+    Rejected because heavy local setup works against the repository's primary job: being read and run by people who haven't been briefed on it. A reader who has to debug a container networking issue before seeing a ledger entry mostly does not see the ledger entry.
+
+    The fair counterpoint: this decision does trade away the most realistic failure modes. The cost section above says so rather than pretending the outbox closes the gap entirely. Someone who wants to see real network partitions will not find them here.
+  </Accordion>
+
+  <Accordion title="Plain monolith with a documented extraction path — rejected" icon="box">
+    The fastest to build, and the honest default for a system of this size. No boundary machinery, no enforcement layer, straightforward imports throughout.
+
+    Rejected because it demonstrates the least. The boundary enforcement is the interesting part of this architecture choice; removing it removes the point. A documented extraction path with nothing checking it is a promise, and promises about module boundaries have a poor record under deadline pressure.
+  </Accordion>
+
+  <Accordion title="Serverless functions per context — not seriously considered" icon="cloud">
+    Would have made local execution harder rather than easier, added a cloud platform dependency to a repository intended to run fully offline, and made the ledger's transactional requirements substantially harder to satisfy without a relational database available in every function's execution context.
+  </Accordion>
+</AccordionGroup>
+
+## A note on enforcement: why two mechanisms are needed
+
+The boundary rule required **two** enforcement mechanisms, and discovering why was its own small investigation.
+
+| Mechanism | Catches | Silently misses |
+| --- | --- | --- |
+| `dependency-cruiser` | Relative imports — `../../ledger/src/posting` | **Package-name imports** — `@arc/ledger` |
+| ESLint `no-restricted-imports` | Package-name imports via `@arc/*` | — |
+
+`@arc/ledger` resolves through `node_modules` to a `dist` path that does not exist until after a build. `dependency-cruiser` cannot resolve the edge and **skips it silently** — no error, no warning, just a rule that quietly does not apply to half the import patterns a developer might write.
+
+<Note>
+Both probes were verified to fire by writing a deliberate violation of each kind before the rules were committed. An architecture rule you have not tried to break is a rule you do not know you have.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="Contexts and events" icon="inbox" href="/architecture/contexts-and-events">
+    The outbox, ports, and how the boundary holds in practice across all six contexts.
+  </Card>
+  <Card title="Architecture overview" icon="layer-group" href="/architecture/overview">
+    The six bounded contexts, what each owns, and how they communicate.
+  </Card>
+</CardGroup>

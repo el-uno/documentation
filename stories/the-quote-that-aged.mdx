@@ -1,0 +1,139 @@
+---
+title: "The Quote That Aged: stale FX rates as unhedged loss"
+sidebarTitle: "The Quote"
+description: "A customer held a quote open for four minutes while the rate moved. Arc honoured it. Every quote is a short-dated option — and options expire."
+icon: "hourglass-half"
+---
+
+Corridor revenue is down 4% on flat volume. Fees are unchanged, the spread is unchanged, and no pricing decision was made. The FX position accounts show small losses concentrated in a handful of transfers — all confirmed several minutes after they were quoted. A customer held a quote open for four minutes while the EUR/KES rate moved against Arc. Arc honoured the original quote and delivered the promised KES amount, absorbing the loss itself. Then it did this hundreds of times.
+
+<Warning>
+**Symptom:** Corridor revenue down 4% with no pricing change and flat volume. Losses concentrated in transfers confirmed minutes after quoting. FX position accounts show systematic shortfalls on a specific subset of transfers.
+</Warning>
+
+## What a quote actually is
+
+A quote looks like a display value — a rate shown to the customer before they confirm. It is not.
+
+<Note>
+**A quote is a short-dated option that you have written and given away for free.** The customer may exercise it if the rate moves in their favour and let it lapse if it moves against them. You hold the risk on both sides and are compensated for neither side of that asymmetry.
+</Note>
+
+That asymmetry does not require anyone to behave badly. A customer who quotes, gets distracted by a notification, comes back four minutes later, and confirms is exercising an option they do not know they hold. Aggregated across everyone who does this, the losses are systematic rather than random — because the transfers that *do* get confirmed late are disproportionately the ones where the delay helped the customer. Transfers where the rate moved against the customer are abandoned before confirmation. The book is not balanced; it is adversely selected.
+
+## The arithmetic
+
+EUR/KES at 139.70, Arc's spread 60 basis points, so the quoted rate to the customer is 138.86.
+
+<Steps>
+  <Step title="Quote issued at 10:00:00">
+    Customer sends €995.09 net, receives KES 138,254.00. Arc's margin is the 60 bp spread, booked explicitly as `revenue.fee.fx_spread.EUR`.
+  </Step>
+  <Step title="The market moves to 139.10 by 10:04:00">
+    The euro weakened 43 bp. The rate Arc could quote now is 138.27 — 59 bp lower than what was quoted.
+  </Step>
+  <Step title="The customer confirms the four-minute-old quote">
+    Arc must deliver KES 138,254.00 but can now only source it at 138.27, requiring €999.88 of the customer's €995.09 net.
+  </Step>
+  <Step title="The spread is gone, and then some">
+    The 60 bp spread absorbed a 43 bp adverse move. Most of this transfer's revenue has been surrendered to the rate movement. A 70 bp move would have put it into loss.
+  </Step>
+</Steps>
+
+<Note>
+**Honouring a stale quote is an unhedged loss.** The spread is compensation for taking on currency risk for the duration of the transfer — not for the duration of the customer's attention span.
+</Note>
+
+## The fix: a 30-second TTL enforced at execution
+
+```ts
+const QUOTE_TTL_MS = 30_000;
+
+assertUsable(quote, now);  // throws QuoteExpiredError if stale
+```
+
+Thirty seconds. Long enough for a human to read a confirmation screen and press a button; short enough that the market cannot move meaningfully in a liquid pair within that window.
+
+Two properties make it work:
+
+<Tabs>
+  <Tab title="assertUsable throws, it does not warn">
+    An expired quote is not usable with a caveat or a soft warning. It is not usable. The customer re-quotes at the current rate — which is mildly inconvenient and correct. A warning that lets the transfer proceed is an option that is still being written.
+  </Tab>
+  <Tab title="The check runs at execution, not at display">
+    A quote validated when the confirmation screen renders and used when the button is pressed has been validated at the wrong moment. The saga re-checks `assertUsable` before the `reserve` step begins. The check at display time is a convenience; the check at execution is the control.
+  </Tab>
+</Tabs>
+
+## Why the spread is its own fee line, not buried in the rate
+
+The important architectural decision in Arc's quote engine is not the TTL. It is that the FX spread is computed **explicitly** rather than left implicit inside the quoted rate:
+
+```text
+net           = send − corridor_fee − network_fee
+receive       = net × quoted_rate
+fx_spread_fee = (net × mid_rate) − (net × quoted_rate)
+```
+
+The customer sees the same quoted rate either way. The difference is entirely in what the ledger records:
+
+| | Spread buried in the rate | Spread as its own fee line |
+| --- | --- | --- |
+| Customer sees | One exchange rate | One exchange rate, plus an itemised margin |
+| Ledger records | One FX conversion journal | An FX journal **and** `revenue.fee.fx_spread.EUR` |
+| P&L can answer | "What did we make?" | "What did we make from corridor fees **versus** from FX margin?" |
+| A stale-quote loss appears as | Slightly worse FX conversion, indistinguishable from a normal rate move | Shortfall against expected spread revenue on a specific transfer |
+
+<Note>
+**Burying the spread in the rate makes the margin invisible to reporting** — which is precisely the number the business runs on. It also makes this specific failure undiagnosable, because there is no expected spread value to compare the outcome against. The 4% revenue decline in the symptom above is findable *only* because the spread has its own account with an expected value per transfer.
+</Note>
+
+## The property test that covers the whole class
+
+One assertion catches the entire category of pricing bug:
+
+<Note>
+**Across the full amount range, the customer is never given more than mid-market rate.** This is a property, tested with generated inputs across randomly chosen amounts and rates.
+</Note>
+
+It catches:
+
+- Sign errors in the spread calculation — applying it in the customer's favour instead of Arc's
+- Rounding that favours the customer at small amounts, where fixed fees and rounded conversions interact badly
+- Rate inversion errors, where `Rate.invert()` is applied one time too many and the direction reverses
+
+Each of these produces a system that quietly gives money away and passes every test that only checks whether the arithmetic balances. Balance would be perfectly satisfied — Arc would simply be poorer, symmetrically.
+
+## The check that belongs at quote time, not mid-saga
+
+While validating the quote, it is worth rejecting the geometrically impossible early:
+
+<Warning>
+**If `send − corridor_fee − network_fee` is not positive, reject at quote time.** A €0.10 transfer cannot carry a €0.35 fixed fee and produce a positive net amount. Failing here costs nothing. Failing mid-saga means unwinding a transfer that could never have completed — compensating journals, a customer notification, and an operational event for something basic arithmetic could have ruled out before anything moved.
+</Warning>
+
+## The lesson
+
+<Steps>
+  <Step title="Any price you display and honour later is an option you have written">
+    Bound it with a TTL. The TTL length is a risk decision — a function of the pair's volatility and your spread, not of what feels convenient in the user interface.
+  </Step>
+  <Step title="Validate at the moment of use, not the moment of display">
+    A check that ran when the screen rendered has told you nothing about the state when the button was pressed. Saga steps re-validate their preconditions.
+  </Step>
+  <Step title="Make every revenue component its own ledger account">
+    Blended revenue cannot be diagnosed. The spread having its own account is what turned an invisible 4% decline into a findable line item with a per-transfer expected value.
+  </Step>
+  <Step title="Reject the impossible as early as it becomes impossible">
+    Checks that are cheap at quote time are expensive mid-saga. Pre-conditions that can be verified before any state changes should be.
+  </Step>
+</Steps>
+
+<CardGroup cols={2}>
+  <Card title="The Settlement Saga" icon="rotate-left" href="/architecture/settlement-saga">
+    Quote mechanics, fee ordering, and the FX spread derivation in full.
+  </Card>
+  <Card title="Settlement and Finality" icon="clock" href="/primer/settlement-and-finality">
+    The domain background: what settlement means and when it becomes final.
+  </Card>
+</CardGroup>

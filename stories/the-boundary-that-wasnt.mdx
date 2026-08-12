@@ -1,0 +1,144 @@
+---
+title: "The Boundary That Wasn't: CI enforcement rule gaps"
+sidebarTitle: "The Boundary"
+description: "The CI architecture rule was green on every build and had been silently skipping half its violations. This one actually happened while building Arc."
+icon: "shield-halved"
+---
+
+The modular-monolith claim rests on one rule: no bounded context imports another context's internal code. `dependency-cruiser` enforces it in CI. It had been green on every build since Phase 0. Then someone wrote a deliberate violation to verify the rule would fire. The build stayed green. The violation sat in the source, quietly ignored, while CI reported a clean pass.
+
+<Warning>
+**Symptom:** A deliberate cross-context import was added to verify the enforcement rule. CI passed. No error. No warning. The violation was real; the enforcement was not. This is a real gap that occurred while building Arc.
+</Warning>
+
+## The claim being protected
+
+Arc's whole topology argument is that six bounded contexts can share one deployable without becoming a monolith, **because the boundaries are mechanically checked rather than merely documented**. Remove the check and the claim collapses into an intention.
+
+Every codebase with a "we don't do that" convention has a directory full of places where someone did, under deadline, with a comment promising to refactor it later. The only thing that prevents that accumulation is a check that runs automatically and cannot be bypassed by intention.
+
+<Note>
+**A modular monolith whose boundaries are documented rather than enforced is a monolith with aspirations.** The enforcement is the architecture. If the check does not work, the architecture does not exist.
+</Note>
+
+## The two import shapes
+
+Two violations were written — one of each shape a developer could plausibly produce:
+
+<Tabs>
+  <Tab title="Relative import">
+    ```ts
+    // services/movement/src/saga.ts
+    import { post } from '../../ledger/src/posting';
+    ```
+
+    What you write when you are inside the monorepo, navigating the directory tree by hand, and reaching sideways into another context's source.
+
+    **Result:** build failed immediately, as designed.
+  </Tab>
+  <Tab title="Package-name import">
+    ```ts
+    // services/movement/src/saga.ts
+    import { post } from '@arc/ledger';
+    ```
+
+    What you write when your editor autocompletes the import and it looks exactly like every other package import in the file. Syntactically indistinguishable from a permitted dependency.
+
+    **Result:** build passed. No error. No warning.
+  </Tab>
+</Tabs>
+
+The first shape was caught. The second shape — the more natural one, the one an IDE would suggest — passed through silently.
+
+## Why it passed
+
+The cause is mundane. That is what makes it dangerous.
+
+<Steps>
+  <Step title="dependency-cruiser resolves imports to file paths">
+    It builds a dependency graph of actual files on disk and applies rules to the edges in that graph. For a rule to fire, an edge must exist in the graph.
+  </Step>
+  <Step title="@arc/ledger resolves through node_modules">
+    In a pnpm workspace, `@arc/ledger` is a symlink to `services/ledger`, whose `package.json` declares its entry point as `dist/index.js`.
+  </Step>
+  <Step title="dist does not exist until after a build">
+    The lint job runs before the build job. The target file is not on disk.
+  </Step>
+  <Step title="An unresolvable edge is skipped, not failed">
+    dependency-cruiser cannot resolve the import to a file, so it does not add the edge to the dependency graph. No edge means no rule evaluation. No rule evaluation means no violation reported.
+  </Step>
+</Steps>
+
+<Warning>
+**The rule did not fail. It did not apply** — which is a much worse failure mode. A rule that errors gets fixed. A rule that quietly skips half its inputs gets trusted, and the trust is what makes it dangerous.
+</Warning>
+
+The configuration was correct. The rule was correct. The build order made half the relevant imports invisible to the tool.
+
+## Why nobody noticed
+
+Every honest signal pointed the wrong way:
+
+- CI was green, and a green rule is read as a working rule.
+- Relative imports were being caught, so the rule visibly did *something*.
+- No cross-context package import existed yet in the codebase — the false negative had no violations to miss.
+- The configuration reviewed correctly. Reading it would not reveal the problem, because the problem is in the interaction between the tool's resolution mechanism and the build order, not in the configuration text.
+
+<Note>
+**A rule with no violations is indistinguishable from a rule that cannot detect violations.** The only way to tell them apart is to produce a violation on purpose and confirm the tool reports it.
+</Note>
+
+## The fix: a second layer with a different failure mode
+
+A second, independent enforcement layer using a completely different mechanism — ESLint's `no-restricted-imports`, which matches on the **import specifier string** rather than on a resolved file path:
+
+```js
+'no-restricted-imports': ['error', {
+  patterns: [{
+    group: ['@arc/ledger', '@arc/product', '@arc/movement', '@arc/risk'],
+    message: 'Contexts must not import each other. Use @arc/contracts or a port.',
+  }],
+}]
+```
+
+ESLint never resolves the specifier to a file. Build order is irrelevant to it. The check runs on the string as written.
+
+| Mechanism | Catches | Misses | Depends on |
+| --- | --- | --- | --- |
+| `dependency-cruiser` | Relative imports (`../../ledger/src/...`) | Package-name imports (`@arc/ledger`) | Files existing on disk at lint time |
+| ESLint `no-restricted-imports` | Package-name imports (`@arc/ledger`) | Relative imports | Nothing — pure string matching |
+
+Neither layer is sufficient alone. Together they cover both import shapes, and — more importantly — **they fail for entirely different reasons**. A change that defeats one is unlikely to defeat the other. That independence is the property worth having.
+
+Both violations were re-run after the fix. Both fired. That verification is the actual deliverable, not the configuration file.
+
+## The general lesson
+
+This is not specifically about dependency-cruiser. It is about a category of control that most engineering teams rely on:
+
+<AccordionGroup>
+  <Accordion title="Controls that fail open are worse than no control" icon="lock-open">
+    A missing check is a known gap. A check that silently does not apply is a **believed** guarantee, and people build on believed guarantees. The same shape appears in: permissive CORS matchers that match too broadly, auth middleware mounted on the wrong route group, monitoring alerts on a metric that stopped being emitted, and backup jobs writing to a bucket nobody has ever restored from.
+  </Accordion>
+  <Accordion title="Test the control, not just the system" icon="vial">
+    A normal test suite does not exercise "does the linter catch this?" — that is a property of the pipeline, and pipelines are usually the least-tested code an organisation runs. The cheap version of testing a control costs almost nothing: keep a fixture that violates each rule and assert the tool reports it in CI.
+  </Accordion>
+  <Accordion title="Prefer layers that fail differently" icon="layer-group">
+    Two enforcement checks with the same failure mode are one check with extra runtime cost. dependency-cruiser depends on module resolution; ESLint pattern matching depends on nothing external. That independence is the design goal.
+
+    Arc uses the same reasoning in the ledger itself: the posting engine validates double-entry balance in application code, and the database validates again via a constraint trigger. Application logic and a `DEFERRABLE INITIALLY DEFERRED` trigger fail for entirely different reasons, and both must agree for a posting to succeed.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+**An architecture rule you have not tried to break is a rule you do not know you have.**
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="Contexts and Events" icon="inbox" href="/architecture/contexts-and-events">
+    What bounded contexts use instead of importing each other.
+  </Card>
+  <Card title="Architecture Overview" icon="cubes" href="/architecture/overview">
+    The modular-monolith topology this rule protects.
+  </Card>
+</CardGroup>

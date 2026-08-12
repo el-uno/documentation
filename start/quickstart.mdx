@@ -1,0 +1,123 @@
+---
+title: "Run Arc Locally: Clone, Migrate, and Verify in 5 Minutes"
+sidebarTitle: "Quickstart"
+description: "Clone the repo, start Postgres and Redis, apply the schema, and run the full verification gate. No cloud account, no service mesh, no extra configuration."
+icon: "terminal"
+---
+
+Arc runs as a single deployable. There is no service mesh to stand up and no cloud account to create — the whole system boots from one command sequence, which is the main reason it was built as a [modular monolith](/decisions/0002-modular-monolith). The steps below take you from zero to a fully passing local verification gate, which is exactly what CI runs on every pull request.
+
+**Prerequisites:** Node 22+, pnpm 9, and Docker.
+
+<Steps>
+  <Step title="Clone the repository and install dependencies">
+    Clone the repo and install all workspace dependencies in one go. The pnpm workspace links the shared packages automatically.
+
+    ```bash
+    git clone https://github.com/el-uno/fintech_arc.git && cd fintech_arc
+    pnpm install
+    ```
+  </Step>
+
+  <Step title="Start Postgres and Redis">
+    Bring up the backing services. Postgres holds the ledger and the transactional outbox; Redis backs the job queues. Both images and their configuration are pinned in `ops/docker-compose.yml`.
+
+    ```bash
+    docker compose -f ops/docker-compose.yml up -d
+    ```
+
+    Wait a few seconds for Postgres to finish initialising before running the next step. You can confirm it is ready with `docker compose -f ops/docker-compose.yml logs postgres | tail -5`.
+  </Step>
+
+  <Step title="Copy the environment file and apply the database schema">
+    Copy the example environment file, then run the Prisma migration. This step is worth pausing on — the migrations do not just create tables. They also install the constraint triggers that enforce the ledger's invariants independently of the application code, so a transaction leaving any journal unbalanced cannot commit even from raw SQL.
+
+    ```bash
+    cp .env.example .env && pnpm prisma migrate deploy --schema prisma/schema.prisma
+    ```
+
+    See [enforced twice, on purpose](/architecture/ledger#enforced-twice-on-purpose) for the detail on what those triggers do.
+  </Step>
+
+  <Step title="Run the verification gate">
+    Run the full gate. This covers formatting, linting (including rules that ban floats near money), type-checking, architecture boundary enforcement, and the complete test suite.
+
+    ```bash
+    pnpm verify
+    ```
+
+    If it is green locally, it will be green on a pull request — CI runs the exact same command.
+  </Step>
+</Steps>
+
+## What `pnpm verify` actually checks
+
+Several of these checks are unusual enough to be worth understanding before you encounter a failure message for the first time.
+
+<AccordionGroup>
+  <Accordion title="Lint — including rules that ban floats near money" icon="ban">
+    ESLint rejects `parseFloat`, `toFixed`, `Math.round`, `Math.floor`, `Math.ceil`, and fractional numeric literals anywhere in source code. Violations look like this:
+
+    ```text
+    error  Fractional number literal. Monetary values are bigint minor units       no-restricted-syntax
+    error  'Math.round' is restricted — use divRound() from @arc/money             no-restricted-properties
+    error  Unexpected use of 'parseFloat'. Floats cannot represent money exactly   no-restricted-globals
+    error  toFixed() formats a float. Use Money.toDecimalString()                  no-restricted-syntax
+    ```
+
+    Exactly two files carry a scoped lint exception, each with a written justification in a comment:
+    - `packages/chain/src/random.ts` — a seeded PRNG that does 32-bit bit-mixing, not money arithmetic
+    - `services/risk/src/sanctions.ts` — the Jaro-Winkler implementation, where `0.9` is an algorithm threshold, not an amount
+
+    [Why money is never a float →](/architecture/money)
+  </Accordion>
+
+  <Accordion title="Architecture boundaries — two independent enforcement layers" icon="shield-halved">
+    `dependency-cruiser` fails the build on any import that crosses a context boundary. An ESLint `no-restricted-imports` rule does the same thing independently.
+
+    Both layers are needed. `dependency-cruiser` catches *relative* imports like `../../ledger/src/posting` but silently misses *package-name* imports like `@arc/ledger`, because that path resolves through `node_modules` to a `dist` directory that does not exist until after a build step. The ESLint rule catches those. The story of discovering that gap is documented in [the boundary that wasn't](/stories/the-boundary-that-wasnt).
+  </Accordion>
+
+  <Accordion title="Tests — unit, property-based, and chaos" icon="flask">
+    The workspace runs roughly 240 tests. The ones that matter most are:
+
+    - **Property-based tests** — the ledger invariant suite runs randomised sequences of deposits, transfers, and withdrawals and asserts that debits always equal credits and no balance goes negative
+    - **Chaos tests** — the settlement saga test injects a failure at each of the saga's five steps in turn and asserts that the ledger ends balanced in every currency every time
+    - **Mutation tests** — the chaos suite was run against a corpus of deliberately broken code to verify it actually catches real failures. One mutation passed all sixteen chaos tests; that story is [the journal that balanced and lied](/stories/the-journal-that-balanced-and-lied)
+
+    [What the tests prove →](/architecture/testing)
+  </Accordion>
+</AccordionGroup>
+
+## The repository layout
+
+```text
+packages/
+├── money/         Money and Rate types, exact rounding helpers — property-based tested
+├── contracts/     Event catalogue and envelope — the shared seam between contexts
+├── bus/           Event bus, transactional outbox, dispatcher
+└── chain/         Chain-agnostic driver + deterministic simulator
+
+services/
+├── ledger/        Double-entry posting engine, balance views
+├── product/       Onboarding, tiers, virtual accounts
+├── movement/      Rails, quotes, the settlement saga, reversals
+└── risk/          KYC/KYB, sanctions screening, AML rules, review queues
+
+prisma/            Schema with ledger tables, balance constraints, append-only triggers, outbox
+ops/               Postgres + Redis compose file and configuration
+apps/docs-site/    This documentation site
+```
+
+`packages/` holds shared primitives that any part of the system may import. `services/` holds the bounded contexts, which may import from `packages/` and from within themselves — **never from each other**. That rule is the load-bearing architectural constraint, and it is mechanically enforced by two independent tools rather than merely documented.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Read the ledger" icon="scale-balanced" href="/architecture/ledger">
+    The core of the system. Every other component is an interface onto the double-entry ledger.
+  </Card>
+  <Card title="Walk a transfer end to end" icon="route" href="/flows/consumer-remittance">
+    €1,000 from Germany to a Kenyan mobile-money wallet, traced entry by entry through every context.
+  </Card>
+</CardGroup>

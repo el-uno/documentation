@@ -1,0 +1,99 @@
+---
+title: "Engineering Stories: Seven Failure Narratives for Arc"
+sidebarTitle: "Overview"
+description: "Seven engineering stories. Each opens on a symptom, walks the diagnosis, and lands on the Arc mechanism that prevents it from happening again."
+icon: "book"
+---
+
+Architecture documentation explains what a system does. It is much worse at explaining **why anyone bothered** — because the reason is always a failure, usually one somebody else already had, expensively. These seven stories are that layer. Each one opens on a symptom, walks the diagnosis the way it would actually unfold, and ends at the specific mechanism in Arc that prevents it. They are self-contained and readable in any order, but there is one worth reading first.
+
+<Note>
+Two of these stories describe things that genuinely happened while building Arc — a mutation that passed sixteen tests, and a boundary rule that silently did not apply. Those are marked. The rest are the standard failures of this domain, told as narrative because that is how they are actually learned.
+</Note>
+
+## Start here if you read one
+
+The most important story in this collection is not about a crash, a data loss, or a missing feature. The ledger balanced. Every test passed. The record was still false.
+
+<Card title="The Journal That Balanced and Lied" icon="triangle-exclamation" href="/stories/the-journal-that-balanced-and-lied">
+  Compensation ran in the wrong order. The ledger balanced perfectly. All sixteen tests passed. The audit trail was fiction.
+
+  **The lesson:** balance is necessary but not sufficient. This is the best argument in the Arc docs for why correctness needs more than one kind of assertion — and it is the story most worth retelling in detail.
+</Card>
+
+## By theme
+
+<Tabs>
+  <Tab title="Exactness">
+    These two stories are about money that went nowhere and a record that said nothing wrong. Both failures are arithmetically invisible — the books closed, the sums added up, and the system was still broken.
+
+    <CardGroup cols={2}>
+      <Card title="The Cent That Vanished" icon="coins" href="/stories/the-cent-that-vanished">
+        The trial balance is off by €0.03. Nobody can find it, because it was never in one place — it was €0.00995 of a cent, three hundred times, rounded away into nothing.
+
+        **Mechanism:** residuals posted to a dedicated rounding account.
+      </Card>
+      <Card title="The Journal That Balanced and Lied" icon="triangle-exclamation" href="/stories/the-journal-that-balanced-and-lied">
+        A balanced ledger with a false audit trail, and a mutation test that caught what sixteen assertions could not.
+
+        **Mechanism:** reverse-order compensation, asserted directly by journal kind and account pairing.
+      </Card>
+    </CardGroup>
+  </Tab>
+
+  <Tab title="Distributed Failure">
+    These two stories are about systems behaving exactly as designed and producing the wrong outcome anyway. One is a retry that became a duplicate payment. The other is an enforcement rule that enforced nothing.
+
+    <CardGroup cols={2}>
+      <Card title="The Payout That Paid Twice" icon="clone" href="/stories/the-payout-that-paid-twice">
+        The rail timed out. The retry succeeded. So did the original.
+
+        **Mechanism:** idempotency keys on every retry boundary, and `retryable` as a typed field rather than a guess from the error message.
+      </Card>
+      <Card title="The Boundary That Wasn't" icon="shield-halved" href="/stories/the-boundary-that-wasnt">
+        The architecture rule was in CI, green on every build, and had been silently skipping half the violations it existed to catch.
+
+        **Mechanism:** two independent enforcement layers — one that resolves files, one that matches strings — with different failure modes.
+      </Card>
+    </CardGroup>
+  </Tab>
+
+  <Tab title="Time and Money">
+    These three stories are about the hidden complexity of time in financial systems. Block confirmations, batch cut-offs, and quote expiry all compound in ways that are easy to miss and expensive once missed.
+
+    <CardGroup cols={2}>
+      <Card title="The Fastest Chain That Settled Last" icon="gauge-high" href="/stories/the-fastest-chain-that-settled-last">
+        Routing to the chain with the shortest block time made settlement twelve times slower.
+
+        **Mechanism:** finality depth, not block time, as the routing input; settlement window derived rather than assumed.
+      </Card>
+      <Card title="The Cut-Off That Cost a Day" icon="clock" href="/stories/the-cutoff-that-cost-a-day">
+        The payment was submitted at 16:00 on Thursday. It arrived Tuesday. Missing a batch window by an hour costs a day, not an hour.
+
+        **Mechanism:** cut-off arithmetic that compounds properly, tested with exact settlement time assertions.
+      </Card>
+    </CardGroup>
+
+    <CardGroup cols={2}>
+      <Card title="The Quote That Aged" icon="hourglass-half" href="/stories/the-quote-that-aged">
+        A customer held a quote open for four minutes while the rate moved. Arc honoured it, and lost money on every one.
+
+        **Mechanism:** a 30-second TTL enforced at execution, and a property test that the customer never beats mid-market.
+      </Card>
+    </CardGroup>
+  </Tab>
+</Tabs>
+
+## Why this format
+
+A mechanism explained in isolation is forgettable. "Rails are idempotent on the caller's key" is a true sentence that will not survive the week. "The rail timed out, we retried, and the beneficiary got paid twice — here is what stopped it" is remembered, and the mechanism comes with it.
+
+Every story ends with the code that prevents the failure and a link to the architecture page that specifies it in full. The narrative is an entry point, not a substitute for the specification.
+
+<Tip>
+If you prefer the specification without the story, the architecture tab covers the same mechanisms without narrative framing.
+</Tip>
+
+<Card title="Architecture Overview" icon="layer-group" href="/architecture/overview">
+  The same mechanisms, specified rather than narrated.
+</Card>

@@ -1,0 +1,102 @@
+---
+title: "Arc — EU↔Africa Stablecoin and Fiat Payment Simulation"
+sidebarTitle: "Overview"
+description: "A simulation of cross-border stablecoin and fiat infrastructure for the EU↔Africa corridor — and a field guide to how stablecoin payments actually work."
+mode: "wide"
+---
+
+Arc models the full backend of a payments business that moves value between Europe and Africa: multi-currency virtual accounts in, an instant swap to stablecoin, chain-agnostic settlement across the middle, and a local-rail payout out the other side. Three surfaces — consumer remittance, enterprise payout, and a white-label **Last Mile API** — all run over one shared set of rails. This site braids two documents together: a deep-dive into that system's architecture down to individual ledger entries, and a primer on how stablecoin payments actually work in 2026 — the economics, the regulation, and the parts that still don't work — because you cannot fairly evaluate the architecture without the second.
+
+<Note>
+  **This is a simulation, not a financial system.** No real funds move, no bank connections exist, and no blockchain runs. Every external integration is a deterministic simulator, and the sanctions list is entirely synthetic — no real person or entity appears in any data. Nothing here constitutes investment, legal, or compliance advice.
+</Note>
+
+## Why this corridor
+
+Sub-Saharan Africa is the most expensive place on earth to send money to. The World Bank puts the average cost of a \$200 remittance to the region at **8.78%** against a UN Sustainable Development Goal target of 3% — with banks, the most expensive channel, averaging 9.50%. Meanwhile the same region absorbed **\$205 billion** of on-chain value in the year to June 2025, up 52%, with stablecoins now roughly 43% of all crypto transaction volume there. That demand is not speculative — it is people and businesses routing around correspondent banking.
+
+| Metric | Figure | Source |
+|---|---|---|
+| Average cost to send \$200 to Sub-Saharan Africa | **8.78%** | World Bank RPW |
+| On-chain value received, SSA, Jul 2024–Jun 2025 | **\$205 bn** | Chainalysis |
+| Total stablecoin market cap, mid-2026 | **~\$313 bn** | BIS |
+| Share of stablecoin supply denominated in USD | **99%** | BIS |
+
+That gap — an 8.78% legacy rail sitting beside a rapidly growing parallel one — is the entire business case. [Why corridors cost so much](/primer/why-corridors-cost-so-much) takes it apart in detail.
+
+## Where to start
+
+<CardGroup cols={2}>
+  <Card
+    title="What Arc Is"
+    icon="circle-info"
+    href="/start/what-arc-is"
+  >
+    Understand what makes Arc a simulation rather than a demo, what is modelled faithfully, and what is deliberately faked.
+  </Card>
+  <Card
+    title="Quickstart"
+    icon="terminal"
+    href="/start/quickstart"
+  >
+    Clone, install, migrate, and run the full verification gate locally in under five minutes.
+  </Card>
+  <Card
+    title="Architecture Overview"
+    icon="layer-group"
+    href="/architecture/overview"
+  >
+    Six bounded contexts, one deployable, an event bus between them, a double-entry ledger underneath everything.
+  </Card>
+  <Card
+    title="War Stories"
+    icon="book"
+    href="/stories/index"
+  >
+    Seven failure narratives — the cent that vanished, the payout that paid twice, the fastest chain that settled last.
+  </Card>
+</CardGroup>
+
+Not sure where to begin? [Reading paths](/start/reading-paths) picks a route in about thirty seconds.
+
+## The three flows
+
+Everything Arc builds exists to serve these three payment flows. Each one exercises a different surface of the same underlying rails.
+
+<Steps>
+  <Step title="Consumer remittance">
+    A Kenyan diaspora worker in Germany sends EUR; a KES mobile-money wallet receives it. The full happy path and every failure mode are documented entry by entry. [Walk it through →](/flows/consumer-remittance)
+  </Step>
+  <Step title="Enterprise payout">
+    A Nigerian importer funds a virtual NGN account and pays a European supplier's IBAN via SEPA Instant. [Walk it through →](/flows/enterprise-payout)
+  </Step>
+  <Step title="Partner Last Mile">
+    An exchange embeds Arc's API to offer its own users EUR payouts without building bank integrations directly. One set of rails, white-labelled.
+  </Step>
+</Steps>
+
+## Build status
+
+Arc is built in phases. This table is kept honest rather than aspirational — pages describing planned work say so at the top, and nothing claims a capability the repository does not have.
+
+| Phase | Scope | Status |
+|---|---|---|
+| 0 | Workspace, money primitives, event bus + outbox, boundary enforcement, CI | ✅ Complete |
+| 1 | Double-entry ledger, balances, invariant suite | ✅ Complete |
+| 2 | Accounts and multi-currency virtual accounts | ✅ Complete |
+| 3 | Chain-agnostic adapter + deterministic simulator | ✅ Complete |
+| 4 | Money movement: rails, quotes, the settlement saga, reversals | ✅ Complete |
+| 5 | Risk & compliance: KYC/KYB, sanctions, AML, review queues | 🔄 In progress |
+| 6 | Platform: auth, gateway, webhooks, observability, secrets | 📋 Planned |
+| 7 | Partner platform, sandbox, Last Mile API, SDKs | 📋 Planned |
+| 8 | Reconciliation, reporting, runbooks | 📋 Planned |
+
+## The core correctness claim
+
+A transfer that settles in seconds is straightforward. A transfer that settles in seconds **and cannot lose a cent when the fourth of five steps fails** is the actual engineering problem Arc is built around.
+
+<Tip>
+  For every failure at every step of the settlement saga, the ledger ends balanced in every currency and the sender's balance is exactly what it was before the transfer began. This claim is asserted by a chaos suite that injects a failure at each saga step in turn — and that suite was mutation-tested to confirm it actually catches real breaks.
+</Tip>
+
+One mutation passed all sixteen tests. That incident is the subject of [the best story on this site](/stories/the-journal-that-balanced-and-lied).

@@ -1,0 +1,134 @@
+---
+title: "The Cut-Off That Cost a Day: banking rail cut-offs"
+sidebarTitle: "The Cutoff"
+description: "Payment submitted at 16:00 on Thursday. It arrived Tuesday. Missing a cut-off by one hour costs a full day — the delays compound, they do not overlap."
+icon: "clock"
+---
+
+An invoice payment is submitted at **16:00 UTC on Thursday**. The batch rail's cut-off is 15:00. The estimate shown to the customer says "arrives within 1 business day." The rail behaves exactly as documented. Nothing fails, nothing is retried, no error is logged. The payment arrives **Tuesday**. Sixty minutes of lateness produced ninety-six hours of delay, and every step in the chain is correct behaviour.
+
+<Warning>
+**Symptom:** Payment submitted at 16:00 on Thursday arrived Tuesday. The customer was told "1 business day." The rail's published latency is T+2. Nothing went wrong — the compounding arithmetic was never done.
+</Warning>
+
+## The arithmetic nobody does
+
+Missing a cut-off feels like being an hour late. It is not. The delay **compounds** in a way that is obvious once written down and invisible until then:
+
+<Steps>
+  <Step title="You miss the window">
+    Submitted at 16:00, cut-off was 15:00. One hour past the deadline.
+  </Step>
+  <Step title="The payment queues to the next opening">
+    Not to 15:00 tomorrow — to the next time the rail **opens**. For a Thursday submission, that is Friday morning.
+  </Step>
+  <Step title="Then it takes the rail's normal latency on top of the wait">
+    The queue position is not a head start. The next-business-day clock starts when Friday's batch is picked up, not when the payment was submitted Thursday afternoon.
+  </Step>
+  <Step title="Weekends and holidays don't count as settlement days">
+    Friday batch → next-business-day = Monday. But EFT rails are often T+2 — Monday settlement date plus two settlement days. T+1 is Tuesday, T+2 is **Wednesday**. Add a public holiday in either jurisdiction and it moves further still.
+  </Step>
+</Steps>
+
+<Note>
+**Missing a batch rail's cut-off by one hour costs a full day — not an hour.** The queued payment starts from the next opening *and then* takes the rail's normal latency. The two delays add together; they do not overlap.
+</Note>
+
+## Why estimates are usually wrong here
+
+The estimate said "within 1 business day," which is the rail's *latency* — its documented, headline number. Latency is what the rail publishes because latency is what the rail controls. It is true and it answers the wrong question.
+
+The customer experiences **submission to arrival**, which is:
+
+```text
+wait_for_next_open + rail_latency + non_business_days
+```
+
+Two of those three terms are outside the rail's control and absent from its published figure. A system that displays the rail's latency is showing the customer a number that is technically accurate and practically irrelevant.
+
+## How Arc models it
+
+Rails carry their cut-off windows as data, not as a comment in the code:
+
+| Rail | Currency | Instant | Cut-off (UTC) | Latency |
+| --- | --- | --- | --- | --- |
+| `sepa_instant` | EUR | yes | — | seconds |
+| `sepa_credit` | EUR | no | 15:00 | next business day |
+| `faster_payments` | GBP | yes | — | seconds |
+| `nip` | NGN | yes | — | seconds |
+| `mpesa` | KES | yes | — | seconds |
+| `eft` | ZAR | no | 14:00 | T+2 |
+
+Two functions do the work:
+
+```ts
+isRailOpen(rail, at): boolean
+nextSettlementTime(rail, submittedAt): Date
+```
+
+`isRailOpen` returns `true` unconditionally for instant rails — they have no window, and handling that once means no caller downstream needs to think about it.
+
+`nextSettlementTime` does the compounding arithmetic correctly: find the next batch opening, then add the rail's latency, then advance past non-business days. The result is the actual arrival time the customer will experience.
+
+<Note>
+**That compounding is asserted with an exact test** — not "later than submission" but the precise timestamp the arithmetic produces. A test that only checked "later than before" would pass an implementation that adds one hour, which is precisely the bug this test exists to prevent.
+</Note>
+
+## The product decision this makes visible
+
+Once the real arrival time is computable rather than estimated, a genuine choice appears — and it only appears because the arithmetic is honest:
+
+<Tabs>
+  <Tab title="sepa_credit (14:00 submission)">
+    Cheaper rail. Cut-off at 15:00. At 14:00, one hour before cut-off, it costs only the rail's next-business-day latency. Good choice for a payment with a week of runway.
+  </Tab>
+  <Tab title="sepa_credit (16:00 submission)">
+    Same rail, same price, two hours after cut-off. Now costs next-business-day latency plus the wait to Friday's opening, plus whatever weekends and holidays intervene. What was a one-day payment becomes a four-day payment.
+  </Tab>
+  <Tab title="sepa_instant (any time)">
+    More expensive, €100,000 cap, always open. Settlement in seconds. The right choice for an invoice due tomorrow when it is already Thursday afternoon.
+  </Tab>
+</Tabs>
+
+At 14:00 the cheap rail costs one day. At 16:00 on Thursday, the same choice costs four days. **The right rail depends on the clock**, which means rail selection cannot be a static per-currency mapping.
+
+## The related trap: T+2 is not two calendar days
+
+`eft` is T+2. That is two **settlement days**, and the count starts from the settlement date — which is itself determined by the cut-off.
+
+Submitted Friday at 15:00, one hour past the 14:00 cut-off:
+
+```text
+Friday 15:00    missed cut-off
+Monday          next opening → settlement date
+Tuesday         T+1
+Wednesday       T+2 → funds available
+```
+
+Five calendar days for a payment that missed its window by sixty minutes. Add a public holiday in either jurisdiction and it extends further — and the two jurisdictions have **different** holiday calendars, which reliably surprises people building their first cross-border corridor.
+
+## The lesson
+
+<Steps>
+  <Step title="Business time is not wall-clock time">
+    Any system touching banking rails needs a business-calendar concept as a first-class citizen. Retrofitting one later means auditing every date calculation in the codebase.
+  </Step>
+  <Step title="Delays compound; they do not overlap">
+    "One hour late" and "one hour of delay" are different quantities. Assert the exact arithmetic, because a test checking "later than before" will pass a broken implementation.
+  </Step>
+  <Step title="Show the customer their arrival time, not the rail's latency">
+    The published number is accurate and answers a question nobody asked. Compute what the customer actually experiences from the moment of submission.
+  </Step>
+  <Step title="Cut-off windows belong in data, not in comments">
+    A cut-off stored as a comment is a cut-off that will be wrong after the next daylight-saving change or holiday schedule update. In a configuration table, it can be tested and updated independently.
+  </Step>
+</Steps>
+
+<CardGroup cols={2}>
+  <Card title="The Settlement Saga" icon="rotate-left" href="/architecture/settlement-saga">
+    Rails, cut-offs, caps, and failure profiles specified in full.
+  </Card>
+  <Card title="The Payout That Paid Twice" icon="clone" href="/stories/the-payout-that-paid-twice">
+    The other timing failure: a payout that succeeded twice instead of once.
+  </Card>
+</CardGroup>

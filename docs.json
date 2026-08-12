@@ -1,0 +1,143 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "luma",
+  "name": "Arc",
+  "description": "Arc is a simulation of cross-border stablecoin and fiat payment infrastructure for the EU↔Africa corridor — and a field guide to how stablecoin payments actually work.",
+  "colors": {
+    "primary": "#1ae39a",
+    "light": "#0c8d5e"
+  },
+  "favicon": "https://media.brand.dev/7daa68c2-40b2-434d-857d-07a3353f35ca.png",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "/"
+  },
+  "fonts": {
+    "heading": { "family": "Inter" },
+    "body": { "family": "Inter" }
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Build plan",
+        "href": "https://github.com/el-uno/fintech_arc/blob/main/docs/BUILD_PLAN.md"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/el-uno/fintech_arc"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guide",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["index", "start/what-arc-is", "start/reading-paths", "start/quickstart"]
+          },
+          {
+            "group": "The Corridor",
+            "pages": [
+              "primer/why-corridors-cost-so-much",
+              "primer/how-stablecoins-work",
+              "primer/settlement-and-finality",
+              "primer/regulation",
+              "primer/the-case-against",
+              "primer/bibliography"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Architecture",
+        "groups": [
+          {
+            "group": "Foundations",
+            "pages": [
+              "architecture/overview",
+              "architecture/money",
+              "architecture/contexts-and-events"
+            ]
+          },
+          {
+            "group": "Core Systems",
+            "pages": [
+              "architecture/ledger",
+              "architecture/chain-layer",
+              "architecture/settlement-saga",
+              "architecture/compliance",
+              "architecture/testing"
+            ]
+          },
+          {
+            "group": "Flows",
+            "pages": [
+              "flows/consumer-remittance",
+              "flows/enterprise-payout",
+              "flows/reversal"
+            ]
+          },
+          {
+            "group": "Decisions",
+            "pages": [
+              "decisions/index",
+              "decisions/0001-money-as-integer-minor-units",
+              "decisions/0002-modular-monolith"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Stories",
+        "groups": [
+          {
+            "group": "Engineering Stories",
+            "pages": [
+              "stories/index",
+              "stories/the-cent-that-vanished",
+              "stories/the-journal-that-balanced-and-lied",
+              "stories/the-fastest-chain-that-settled-last",
+              "stories/the-payout-that-paid-twice",
+              "stories/the-cutoff-that-cost-a-day",
+              "stories/the-boundary-that-wasnt",
+              "stories/the-quote-that-aged"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Practice",
+        "groups": [
+          {
+            "group": "Question Banks",
+            "pages": [
+              "practice/index",
+              "practice/ledger",
+              "practice/distributed-systems",
+              "practice/chain-and-settlement",
+              "practice/compliance"
+            ]
+          },
+          {
+            "group": "Self-Check",
+            "pages": [
+              "practice/quiz-ledger",
+              "practice/quiz-settlement"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/el-uno/fintech_arc"
+    }
+  },
+  "search": {
+    "prompt": "Search Arc docs"
+  }
+}

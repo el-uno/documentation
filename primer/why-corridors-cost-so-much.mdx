@@ -1,0 +1,88 @@
+---
+title: "Why Cross-Border Payments to Sub-Saharan Africa Cost So Much"
+sidebarTitle: "Corridor Costs"
+description: "Where the 8.78% average cost to Sub-Saharan Africa goes: correspondent chains, pre-funding, thin-market FX, and the last-mile distribution layer."
+---
+
+A remittance is one of the simplest financial products imaginable. You have €1,000 in Germany and you want a specific person in Kenya to receive shillings. No credit is extended, no risk is transformed, no maturity is changed — it is a message plus a settlement. Yet it costs, on average, **8.78%** to send $200 to Sub-Saharan Africa. That figure comes from the World Bank's [Remittance Prices Worldwide](https://remittanceprices.worldbank.org/) database, which prices a standardised $200 transfer across corridors every quarter. The global average sits around **6.49%**; Sub-Saharan Africa is the most expensive receiving region on earth, at roughly triple the UN Sustainable Development Goal target of 3% (SDG 10.c). The interesting question is not _that_ it is expensive — it is **where the money goes**, because the answer determines whether a stablecoin rail helps at all.
+
+## The numbers at a glance
+
+| Metric | Figure | Source |
+|---|---|---|
+| Global average cost of sending $200 | 6.49% | World Bank RPW |
+| Average cost to Sub-Saharan Africa | 8.78% | World Bank RPW |
+| Banks, as a channel | ~9.50% | World Bank RPW |
+| Digital-first providers | ~3.65% | World Bank RPW |
+| UN SDG 10.c target | 3.0% | United Nations |
+
+Banks as a channel are worse than the regional average; digital-first providers are closer to the SDG target. The spread between those two numbers is the opportunity the architecture here is built around.
+
+---
+
+## The four cost layers
+
+### 1. Correspondent banking
+
+There is no direct wire from a German bank to a Kenyan one. There is a chain of banks that each hold accounts with the next, and a payment is a sequence of debits and credits along that chain — each hop taking a fee, adding latency, and adding a party who can freeze the payment.
+
+That chain has been getting shorter for the wrong reason. **De-risking** — global banks terminating correspondent relationships in jurisdictions where the compliance cost outweighs the revenue — has cut the number of active correspondent relationships worldwide substantially since 2011, with Africa and small island states hit hardest. Fewer routes means less competition on the routes that remain, which means wider spreads. The Financial Stability Board has [tracked this decline](https://www.fsb.org/) for over a decade.
+
+<Note>
+This is the cost a stablecoin rail genuinely removes. Replacing a four-hop correspondent chain with one on-chain transfer between two regulated entities eliminates the intermediary fees and the intermediary *discretion* at the same time.
+</Note>
+
+### 2. Pre-funding and trapped working capital
+
+To pay out shillings instantly in Nairobi, someone must already hold shillings in Nairobi. Every payout corridor requires float sitting in destination accounts before any customer shows up. That capital is dead: it earns nothing useful, it is exposed to the destination currency, and it scales linearly with volume. For a provider operating twenty corridors, pre-funding is frequently the single largest item on the balance sheet, and its carrying cost is passed straight to the customer in the spread.
+
+A stablecoin rail attacks this by shortening the time between funds leaving the sender and arriving at the payout partner from days to seconds, so less float is needed to cover the same volume. It does not eliminate float — you still need shillings in Nairobi — but it changes the multiplier significantly.
+
+<Note>
+Arc models pre-funding explicitly. The float balance and the in-transit obligation are tracked as separate ledger entries per currency, so the question "how much capital is trapped in this corridor right now?" is a query against the ledger rather than a manual estimate.
+</Note>
+
+### 3. FX spread in a thin market
+
+EUR/USD is one of the deepest markets in the world and trades at a spread measured in fractions of a basis point. EUR/KES is not. Nor is EUR/NGN — and Nigeria has spent much of the last several years with a gap between official and parallel rates wide enough that "the exchange rate" was an ambiguous phrase.
+
+The spread on a thin pair is the honest price of someone taking currency risk in a market where they may not be able to offload it quickly. It is real economic cost, not rent.
+
+<Warning>
+**A stablecoin rail does not remove thin-market FX spread.** Converting EUR → USDC → KES still requires someone to sell shillings for dollars. The chain moved the dollar leg; it did nothing to the shilling leg. This is the most over-claimed benefit in the sector. "Instant, near-zero-cost cross-border payments" describes the *middle* leg. The first and last legs are still fiat, still local, and still priced by whoever holds the local currency risk. Arc reflects this by making the FX spread an explicit, separately-reported fee line rather than burying it in a quoted rate — because a margin hidden in the rate is a margin invisible to reporting.
+</Warning>
+
+### 4. Last-mile distribution
+
+The recipient needs shillings in a form they can actually use — usually an M-Pesa balance, sometimes a bank account, sometimes cash from an agent. That network exists, it costs money to run, and its operator prices access to it. Nothing about a blockchain builds an agent network in Kisumu. This cost is untouched by the stablecoin rail.
+
+---
+
+## What a stablecoin rail actually changes
+
+<CardGroup cols={2}>
+  <Card title="Where it helps" icon="circle-check">
+    Correspondent-chain fees and hops. Settlement latency, therefore float requirements. Weekend and holiday windows — chains do not observe bank holidays. Traceability and auditability of the middle leg.
+  </Card>
+  <Card title="Where it does not help" icon="circle-xmark">
+    Thin-market FX spread. Last-mile distribution economics. KYC, sanctions screening, and AML costs. The need to hold destination-currency float at all.
+  </Card>
+</CardGroup>
+
+A realistic claim is therefore not "near-zero cost." It is **"we removed two of the four cost layers, and the other two are now visible as explicit line items."** That is a smaller claim and a much more defensible one. Every fee in Arc's architecture is a separate ledger entry against its own account, so corridor P&L can attribute revenue between the corridor fee and the FX margin rather than reporting one blended number.
+
+---
+
+## Why the demand is already there
+
+The theory is beside the point, because the behaviour has already happened. Chainalysis reports Sub-Saharan Africa received **more than $205 billion** in on-chain value between July 2024 and June 2025 — a 52% year-on-year increase — with stablecoins accounting for roughly **43%** of the region's crypto transaction volume, and Nigeria alone at approximately $92 billion. Their [regional analysis](https://www.chainalysis.com/blog/subsaharan-africa-crypto-adoption-2025/) attributes this to inflation and foreign-currency access rather than speculation: people holding dollars because their own currency is losing value, and businesses settling in dollars because getting them through official channels is slow.
+
+**That is the demand Arc simulates serving.** Not a crypto product — a payments product whose middle leg happens to be a stablecoin because the alternative middle leg costs more and takes longer.
+
+<Card title="Next: how stablecoins actually work" icon="coins" href="/primer/how-stablecoins-work">
+  Issuance, redemption, reserves, and why the peg is a redemption promise rather than a property of the token.
+</Card>
+
+---
+
+*Sources: [World Bank, Remittance Prices Worldwide](https://remittanceprices.worldbank.org/) · [World Bank remittance cost indicators](https://data.worldbank.org/indicator/SI.RMT.COST.IB.ZS) · [Chainalysis, Sub-Saharan Africa crypto adoption](https://www.chainalysis.com/blog/subsaharan-africa-crypto-adoption-2025/) · [Financial Stability Board](https://www.fsb.org/). Figures are the most recent published at the time of writing; see [the bibliography](/primer/bibliography) for full references and retrieval dates.*

@@ -1,0 +1,104 @@
+---
+title: "ADR 0001: Money as integer minor units, enforced by lint"
+sidebarTitle: "ADR 0001"
+description: "Every monetary value is a bigint count of minor units. No floats anywhere in monetary APIs, enforced by ESLint rather than left to convention."
+---
+
+Arc's central invariant is that every journal balances exactly — debits equal credits, with no tolerance, no epsilon, no "close enough." That single requirement constrains the numeric representation before any other design choice is made. This record captures why integer minor units held as `bigint` is the right representation for a system that must be exact, and why every alternative was ruled out.
+
+<Info>
+**Status:** Accepted · **Phase:** 0 · **Supersedes:** none · **Superseded by:** none
+</Info>
+
+## Context
+
+The exactness requirement rules out any representation where arithmetic can produce rounding error. But the system also handles assets with wildly different decimal scales:
+
+| Asset class | Decimal places | Example magnitude in base units |
+| --- | --- | --- |
+| EUR, USD, KES, NGN | 2 | 1e2 – 1e10 |
+| USDC, USDT | 6 | 1e6 – 1e15 |
+| ETH and most ERC-20s | 18 | 1e18 and up |
+
+An IEEE-754 double is exact only to 2^53 ≈ 9.007 × 10^15. That covers euro cents comfortably and covers an 18-decimal token balance not at all — a single ordinary ETH balance expressed in wei exceeds the safe integer ceiling.
+
+So the question was not "are floats accurate enough for fiat?" but "what representation makes the exactness requirement structural rather than aspirational, across every asset class Arc will ever touch?"
+
+## Decision
+
+Every monetary value is an **integer count of the currency's minor units, held as a `bigint`, paired with a currency code**.
+
+No `number` appears in any monetary API. Rounding happens only through `divRound`, which requires an explicit mode parameter. The residual from any division is always returned so it can be posted to a rounding account and queried later.
+
+This is enforced by ESLint, not by convention. The following are build errors in Arc source:
+
+```text
+error  Fractional number literal. Monetary values are bigint minor units       no-restricted-syntax
+error  'Math.round' is restricted — use divRound() from @arc/money             no-restricted-properties
+error  Unexpected use of 'parseFloat'. Floats cannot represent money exactly   no-restricted-globals
+error  toFixed() formats a float. Use Money.toDecimalString()                  no-restricted-syntax
+```
+
+<Note>
+**A convention that depends on every future contributor remembering it is not a convention — it is a countdown.** Making it a build failure is what turns the decision into a property of the system rather than a note in a README.
+</Note>
+
+Two files carry a scoped ESLint disable with a written justification: the seeded PRNG in `packages/chain/src/random.ts` (32-bit bit-mixing, not money) and the Jaro–Winkler implementation in `services/risk/src/sanctions.ts` (similarity thresholds, not amounts). Each disable is file-scoped with the reasoning written directly above it, not a repository-wide relaxation.
+
+## Consequences
+
+### What this makes easy
+
+- **Arithmetic is exact and associative.** `(a + b) + c === a + (b + c)` holds. This does not hold for floats, and every reconciliation and batching path depends on it holding.
+- **The balance invariant needs no epsilon.** The ledger check is `debits === credits`, full stop. There is no defensible answer to "how far off is acceptable?"
+- **18-decimal assets work without special-casing.** Chain assets and fiat use the same type, the same arithmetic, and the same paths.
+- **Rounding is a stated policy at each boundary** rather than an emergent property of whichever operation happened to run last.
+- **Residuals are auditable.** `divResidual` returns the exact leftover so it can be posted to a named rounding account and queried in any reconciliation.
+
+### Costs and gaps
+
+<Warning>
+- **Every amount must be converted at the system edge.** JSON carries minor units as **strings**, never as JSON numbers, because most clients silently parse a JSON number as a float — which would reintroduce the exact problem this decision exists to prevent. Every API boundary, event envelope, and database column needs an explicit codec.
+- **Callers must choose a rounding mode explicitly.** More verbose. That verbosity is intentional: a rounding mode chosen by default is a rounding mode nobody reviewed.
+- **Ergonomic cost.** `Money.multiply(rate)` is more typing than `amount * rate`, and every new contributor has to internalise the type before writing monetary code.
+- **Third-party interop requires care at the edge.** Any library or API that returns a float must be converted immediately and correctly, once, at the boundary. The conversion itself can be wrong.
+</Warning>
+
+## Alternatives
+
+<AccordionGroup>
+  <Accordion title="Floats — rejected" icon="xmark">
+    Binary fractions cannot represent most decimal money values. `0.1 + 0.2 === 0.30000000000000004`, and each individual error is around 1e-17.
+
+    Individually negligible; structurally fatal. The errors accumulate in exactly the places that matter — the FX, fee, and batching paths that run most often and feed reconciliation. The result is a system where the trial balance is close to zero, and close to zero is not a property anyone can defend or certify.
+
+    The 2^53 ceiling settles it independently: an 18-decimal token balance cannot be held in a double at all.
+  </Accordion>
+
+  <Accordion title="A decimal library, or Postgres NUMERIC — viable, rejected" icon="scale-balanced">
+    This is the mainstream answer for financial systems, and it is a good one. Arbitrary-precision decimals handle the accuracy problem correctly.
+
+    Rejected for three reasons:
+
+    1. **Integers are faster**, and the ledger's hot path is summing large numbers of entries.
+    2. **Integers map directly** onto both ISO-4217 minor units and on-chain base units. A decimal type requires a conversion at every chain boundary — a conversion that can be wrong.
+    3. **Precision configuration.** A decimal library has a precision setting somewhere, and "somewhere" eventually becomes "in two places that disagree at 2 a.m."
+
+    The honest counterpoint: a decimal type is more ergonomic and less surprising to contributors new to the codebase. That cost was accepted deliberately.
+  </Accordion>
+
+  <Accordion title="Integer cents as number rather than bigint — rejected" icon="hashtag">
+    Sidesteps the fractional-representation problem while keeping familiar arithmetic. Works correctly for fiat currencies.
+
+    Rejected on the 2^53 ceiling alone. For a system that settles in 6- and 18-decimal on-chain assets, this is not a close call. A solution that works for EUR but fails for USDC is not a solution.
+  </Accordion>
+</AccordionGroup>
+
+<CardGroup cols={2}>
+  <Card title="Why money is never a float" icon="calculator" href="/architecture/money">
+    The same decision explained rather than recorded, with the rounding-residual mechanism worked through in full.
+  </Card>
+  <Card title="The cent that vanished" icon="book" href="/stories/the-cent-that-vanished">
+    What this decision prevents, told as the failure mode it was built to stop.
+  </Card>
+</CardGroup>

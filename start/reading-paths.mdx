@@ -1,0 +1,132 @@
+---
+title: "Reading Paths: Four Routes Through Arc's Documentation"
+sidebarTitle: "Reading Paths"
+description: "Four curated routes through this site — for domain understanding, system architecture, war stories, or interview prep. Pick the one that fits your goal."
+icon: "compass"
+---
+
+This site spans roughly forty pages across four areas. Reading front to back works, but most people have a specific reason for being here. The four paths below get you to the right content without detours — each one is a complete, sequenced route that stands on its own. Pick the tab that matches your goal and follow the steps in order.
+
+<Tabs>
+  <Tab title="The Domain">
+    **~50 minutes · no code**
+
+    You want to understand how stablecoin cross-border payments work well enough to evaluate a claim about them. This path never opens a source file. By the end you will know where the 8.78% corridor cost actually goes, how a stablecoin peg works (and how it fails), what finality really means, and what the best critics of stablecoins say.
+
+    <Steps>
+      <Step title="Why corridors cost so much">
+        Start here. Correspondent banking, pre-funding, FX spreads, and exactly where the 8.78% average remittance cost ends up. This is the business case the rest of the site is a response to. [Read →](/primer/why-corridors-cost-so-much)
+      </Step>
+      <Step title="How stablecoins work">
+        Issuance, redemption, reserve composition, and the difference between a peg and a promise. Most explanations stop at "it's pegged to the dollar." This one doesn't. [Read →](/primer/how-stablecoins-work)
+      </Step>
+      <Step title="Settlement and finality">
+        Why "instant" is a marketing word and finality is a probability curve. The distinction matters every time you design a system that acts on a confirmed transaction. [Read →](/primer/settlement-and-finality)
+      </Step>
+      <Step title="The 2026 regulatory picture">
+        GENIUS Act rulemaking, MiCA's transitional cliff, Kenya's VASP Act, Nigeria's ISA. The regulatory landscape is changing faster than most technical documentation acknowledges. [Read →](/primer/regulation)
+      </Step>
+      <Step title="The case against">
+        The BIS argument that stablecoins fail the three tests of sound money — taken seriously and engaged with, not strawmanned. Most project sites don't include this page. [Read →](/primer/the-case-against)
+      </Step>
+    </Steps>
+
+    Finish at [the bibliography](/primer/bibliography) if you want the primary sources cited throughout.
+  </Tab>
+
+  <Tab title="The System">
+    **~90 minutes · code and diagrams**
+
+    You want to read the architecture end to end. Order matters here: the ledger has to exist before money can move, and the event bus has to exist before contexts can coordinate. Follow these steps in sequence.
+
+    <Steps>
+      <Step title="Architecture overview">
+        Six bounded contexts, one deployable, and an event bus between them. This page establishes the vocabulary and the boundary rules that every subsequent page assumes. [Read →](/architecture/overview)
+      </Step>
+      <Step title="Why money is never a float">
+        The single primitive decision the entire system is built on. Arc uses `bigint` minor units everywhere, and a lint rule enforces it. Understanding this before reading ledger entries makes everything else clearer. [Read →](/architecture/money)
+      </Step>
+      <Step title="The ledger">
+        Chart of accounts, the balance rule, and a fully worked EUR→KES transfer traced entry by entry. This is the core of the system. Everything else is an interface onto it. [Read →](/architecture/ledger)
+      </Step>
+      <Step title="Contexts and events">
+        The transactional outbox, at-least-once delivery, idempotent handlers, and the mechanical enforcement of context boundaries. [Read →](/architecture/contexts-and-events)
+      </Step>
+      <Step title="The chain layer">
+        The chain-agnostic driver, the deterministic simulator, per-chain physics, and how reorgs roll back cleanly. [Read →](/architecture/chain-layer)
+      </Step>
+      <Step title="The settlement saga">
+        Five steps, five compensating actions, and why the compensation order matters as much as the forward order. [Read →](/architecture/settlement-saga)
+      </Step>
+      <Step title="What the tests prove">
+        Property-based tests for ledger invariants, mutation testing on the chaos suite, and what it means that one mutation passed all sixteen tests. [Read →](/architecture/testing)
+      </Step>
+    </Steps>
+
+    After finishing those seven pages, walk a [consumer remittance flow](/flows/consumer-remittance) end to end to see all the pieces assembled into a real transfer.
+  </Tab>
+
+  <Tab title="The Stories">
+    **~40 minutes · start anywhere**
+
+    Seven failure narratives. Each one opens on a symptom, walks through the diagnosis, and lands on the specific piece of Arc that prevents or surfaces the problem. They are self-contained and can be read in any order — but if you read only one, read this one first:
+
+    <Card title="The journal that balanced and lied" icon="triangle-exclamation" href="/stories/the-journal-that-balanced-and-lied">
+      A mutation that broke the audit trail and passed all sixteen chaos tests. The best argument on this site for why a balanced ledger is necessary but not sufficient — and why mutation testing exists.
+    </Card>
+
+    The remaining six stories, ordered roughly by difficulty:
+
+    - [The cent that vanished](/stories/the-cent-that-vanished) — rounding residuals and why they accumulate
+    - [The payout that paid twice](/stories/the-payout-that-paid-twice) — idempotency failure under timeout
+    - [The cut-off that cost a day](/stories/the-cutoff-that-cost-a-day) — batch rails and compounding delay
+    - [The fastest chain that settled last](/stories/the-fastest-chain-that-settled-last) — block time is not finality
+    - [The quote that aged](/stories/the-quote-that-aged) — stale FX rates as an unhedged loss
+    - [The boundary that wasn't](/stories/the-boundary-that-wasnt) — an architecture rule that silently failed to hold
+  </Tab>
+
+  <Tab title="Interview Prep">
+    **~2 hours · active recall**
+
+    You have a payments, ledger, or infrastructure interview coming up. Work through these steps in order. Answer each question out loud — or write it out — before reading the worked answer. The retrieval attempt is what makes the preparation stick.
+
+    <Steps>
+      <Step title="Read the ledger and the saga first">
+        You need [the ledger](/architecture/ledger) and [the settlement saga](/architecture/settlement-saga) fully in your head before anything else. Every payments interview question eventually traces back to one of those two topics.
+      </Step>
+      <Step title="Work the question banks">
+        Four banks, one topic each — answer before you read. [Ledger questions](/practice/ledger) · [Distributed systems](/practice/distributed-systems) · [Chain and settlement](/practice/chain-and-settlement) · [Compliance](/practice/compliance)
+      </Step>
+      <Step title="Run the self-check quizzes">
+        Timed, no hints. [Ledger quiz](/practice/quiz-ledger) · [Settlement quiz](/practice/quiz-settlement)
+      </Step>
+      <Step title="Borrow the stories">
+        A concrete failure narrative beats an abstract description in every interview. The stories are there to be retold in your own words. [Browse the stories →](/stories)
+      </Step>
+    </Steps>
+
+    <Note>
+      The strongest answers on this site are about what *didn't* work — the mutation that passed all sixteen tests, the boundary rule that silently failed to fire. Interviewers remember specifics. Generalised answers about "eventual consistency" do not stick the way a named failure does.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Visual conventions used throughout this site
+
+Two recurring block styles appear across the architecture and flow pages. Recognising them saves time.
+
+<AccordionGroup>
+  <Accordion title="Teal claim blocks — code enforces this" icon="shield-check">
+    A teal block marks a **load-bearing claim the code enforces**. There is a test suite, a database constraint trigger, or a lint rule behind it — not just a comment in the source. When you see one, you can verify it by reading the referenced test or schema.
+
+    Example: *"For every failure at every step of the settlement saga, the ledger ends balanced in every currency."* That claim is backed by the chaos suite in the settlement saga tests, covered in [What the tests prove](/architecture/testing).
+  </Accordion>
+
+  <Accordion title="Amber gap blocks — known limitation" icon="triangle-exclamation">
+    An amber block marks a **known gap**: something that is modelled but not fully wired, a capability that is planned but not yet built, or a limitation accepted on purpose with a documented trade-off. These are stated rather than buried.
+
+    Example: *"Because Arc runs as a modular monolith, it never suffers a true network partition between contexts."* That limitation is accepted and documented in ADR 0002, not hidden.
+  </Accordion>
+</AccordionGroup>
+
+Account codes appear throughout as structured strings — `asset.float.bank.EUR`, `liability.customer.va_1.KES` — because a journal entry should be legible in a log or a `psql` session without joining any lookup tables. All monetary figures are integer minor units: `10000n` is €100.00. There are no floats anywhere near money, and there is a lint rule that enforces it.

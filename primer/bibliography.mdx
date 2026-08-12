@@ -1,0 +1,132 @@
+---
+title: "Bibliography: All Sources Cited Across the Arc Primer"
+sidebarTitle: "Bibliography"
+description: "Every source cited across the primer, what each is good for, and which figures come from secondary aggregators rather than primary institutions."
+---
+
+Sources below are grouped by what they are good for rather than alphabetically, because the useful question is usually "who should I believe about *this*" rather than "what did they cite." Each entry notes the specific figures it supports and any caveats on methodology or institutional interest. The primer exists to give you enough context to read these sources critically — not to replace them.
+
+<Warning>
+**Figures age fast.** Stablecoin market data moves monthly and the rulemaking cited here is live. Every number on this site carries the date and body it came from so it can be re-checked rather than inherited. Where a figure comes from a secondary aggregator rather than the primary body, it is flagged in the entry. Retrieved August 2026.
+</Warning>
+
+---
+
+## Corridor economics and remittance cost
+
+<Card title="World Bank — Remittance Prices Worldwide" icon="globe" href="https://remittanceprices.worldbank.org/">
+  The authoritative source for what it actually costs to send money between two specific places. Prices a standardised $200 transfer per corridor, per channel, quarterly, going back to 2008.
+
+  **Use it for:** the 6.49% global average, the 8.78% Sub-Saharan Africa average, and the bank-versus-digital channel split cited on [Why corridors cost so much](/primer/why-corridors-cost-so-much).
+
+  **Watch for:** the headline is a *simple* average across corridors, not volume-weighted. The amount-weighted picture is cheaper, because high-volume corridors are more competitive. The 8.78% figure is the right framing for understanding the structural problem; it is not the price you would pay on the EU↔Nigeria corridor specifically.
+</Card>
+
+<Card title="World Bank — remittance cost indicators (SI.RMT.COST.IB.ZS)" icon="chart-line" href="https://data.worldbank.org/indicator/SI.RMT.COST.IB.ZS">
+  The same dataset as machine-readable time series, by receiving and sending country. Better than the PDF if you want to plot a specific corridor rather than a regional average.
+</Card>
+
+<Card title="Financial Stability Board — correspondent banking" icon="building-columns" href="https://www.fsb.org/">
+  The FSB's long-running work on the decline in correspondent banking relationships worldwide.
+
+  **Use it for:** the de-risking argument — why fewer routes means wider spreads, and why Africa and small island states were hit hardest. The FSB has tracked this since 2011, which is the baseline for the "substantial decline" claim.
+</Card>
+
+---
+
+## Adoption and on-chain flows
+
+<Card title="Chainalysis — Sub-Saharan Africa crypto adoption" icon="chart-simple" href="https://www.chainalysis.com/blog/subsaharan-africa-crypto-adoption-2025/">
+  Regional on-chain value received, ranked by country, with a stablecoin share breakdown.
+
+  **Use it for:** the $205 billion in regional value received between July 2024 and June 2025 (+52% year-on-year), Nigeria at roughly $92 billion, and stablecoins at roughly 43% of regional transaction volume.
+
+  **Watch for:** the methodology is proprietary and attributes flows by heuristic address clustering. It is the best available series for this region and it is an estimate, not a direct measurement. Chainalysis has a commercial interest in the sector growing, which is worth holding in mind when reading their framing. The absolute figures are less important than the directional trend and the stablecoin share.
+</Card>
+
+---
+
+## Monetary analysis and the case against stablecoins
+
+<Card title="BIS — Annual Economic Report 2025, Chapter III" icon="landmark" href="https://www.bis.org/publ/arpdf/ar2025e3.htm">
+  The single most important document on this list, and the strongest available argument *against* the thesis Arc simulates. Sets out the three tests of sound money — singleness, elasticity, integrity — and argues stablecoins fail all three. Also contains the dollarisation argument for emerging markets and the volume-decomposition analysis.
+
+  **Use it for:** the analytical frame in [The case against](/primer/the-case-against), and for understanding what the central banking establishment actually argues.
+
+  **Watch for:** the BIS is an institution of central banks assessing an instrument that competes with central bank money. The analysis is rigorous; the institutional interest is real. Read it for the framework, not as a neutral assessment. [PDF](https://www.bis.org/publ/arpdf/ar2025e3.pdf) · [Press release](https://www.bis.org/press/p250624.htm)
+</Card>
+
+<Card title="BIS — 'Stablecoins: framing the debate' (April 2026)" icon="microphone" href="https://www.bis.org/speeches/sp260420.pdf">
+  A more recent and more concise statement of the same position, with updated market-size figures. Reports approximately $315 billion total market cap as of early April 2026, approximately 99% dollar-denominated. The 99% figure and the $315 billion figure are sourced here; the ~$313 billion figures cited from secondary aggregators should be reconciled against this.
+</Card>
+
+---
+
+## United States — GENIUS Act and rulemaking
+
+<Card title="S.1582 — GENIUS Act, 119th Congress" icon="scroll" href="https://www.congress.gov/bill/119th-congress/senate-bill/1582/text">
+  The statute itself, enacted July 2025. Shorter than expected and heavily delegating to agency rulemaking — which is why the instruments below matter more than the text of the Act itself.
+</Card>
+
+<Card title="Chapman and Cutler — GENIUS Act rulemaking tracker" icon="list-check" href="https://www.chapman.com/publication-genius-act-rulemaking-tracker">
+  The practical way to keep current. Tracks every agency's proposed and final rules with comment deadlines in one place.
+
+  **Use it as** the entry point into the rulemaking process; follow through to the Federal Register for anything you intend to rely on operationally.
+</Card>
+
+The primary rulemaking instruments cited on [the regulation page](/primer/regulation):
+
+| Instrument | Date | Link |
+|---|---|---|
+| Treasury ANPRM, GENIUS Act implementation | 19 Sep 2025 | [Federal Register](https://www.federalregister.gov/documents/2025/09/19/2025-18226/genius-act-implementation) |
+| OCC proposed rules for stablecoin issuance | 2 Mar 2026 | [Federal Register](https://www.federalregister.gov/documents/2026/03/02/2026-04089/implementing-the-guiding-and-establishing-national-innovation-for-us-stablecoins-act-for-the) · [OCC Bulletin 2026-3](https://www.occ.gov/news-issuances/bulletins/2026/bulletin-2026-3.html) |
+| FinCEN/OFAC joint proposed rule, AML and sanctions | Apr 2026 | [Treasury](https://home.treasury.gov/news/press-releases/sb0435) |
+| Treasury principles, "substantially similar" state regimes | 3 Apr 2026 | [Federal Register](https://www.federalregister.gov/documents/2026/04/03/2026-06489/genius-act-broad-based-principles-for-determining-whether-a-state-level-regulatory-regime-is) |
+
+---
+
+## European Union — MiCA
+
+<Card title="Regulation (EU) 2023/1114 (MiCA)" icon="star" href="https://eur-lex.europa.eu/eli/reg/2023/1114/oj">
+  Fully applicable since 30 December 2024. The EU-wide transitional period ended 1 July 2026.
+
+  **Read:** Title III for asset-referenced tokens, Title IV for e-money tokens — the latter being the category a single-currency payment stablecoin falls into, and the one with the strictest reserve and redemption rules.
+</Card>
+
+<Card title="European Banking Authority" icon="building" href="https://www.eba.europa.eu/">
+  The supervisor for EMTs and ARTs under MiCA, and the source for the technical standards that make the regulation operational — including the regulatory technical standards on EMT thresholds and reserve requirements.
+</Card>
+
+---
+
+## Africa — Kenya and Nigeria
+
+<Card title="Kenya — Virtual Asset Service Providers Act, 2025" icon="scale-balanced" href="https://new.kenyalaw.org/akn/ke/act/2025/20/eng@2025-11-04">
+  The Act as enacted, from Kenya Law. Presidential assent 15 October 2025; implementing regulations gazetted July 2026.
+
+  **Note the dual-regulator split:** CBK for custodial wallets, payment processors, and stablecoin issuance; CMA for exchanges and trading platforms. A corridor operator paying out to M-Pesa is a payment-processing activity and falls under CBK supervision.
+</Card>
+
+The **Nigeria Investments and Securities Act 2025** grants the SEC express jurisdiction over virtual and digital asset exchanges, custodians, and VASPs. The **Nigeria Tax Administration Act 2025** confirms a 10% capital gains charge on digital asset disposals. Both are best read through Nigerian practitioner commentary, as consolidated official texts have been slow to circulate in accessible form.
+
+---
+
+## Figures to treat with caution
+
+Three numbers appear widely in 2026 coverage and come from **secondary aggregators rather than primary bodies**. They are cited on this site with that caveat and should not be relied on without checking the underlying methodology.
+
+| Figure | Caveat |
+|---|---|
+| **~$313 billion total stablecoin market cap, mid-2026** (+23% YoY) | From secondary aggregators. Consistent with the ~$315 billion the BIS reported for early April 2026 — use the BIS figure in preference when precision matters. |
+| **~$7.2 trillion settled in February 2026** | Raw on-chain transfer volume. Includes trading, bridging, arbitrage, and bot activity. Not a measure of payment activity and should not be cited as one. |
+| **$350–550 billion in genuine real-economy payments in 2025** | Against $28–62 trillion in raw transfers. An estimate with a wide methodological band — but far closer to the number that matters. The gap between this and the headline is the most important thing to understand about stablecoin volume statistics. |
+
+---
+
+## What is deliberately absent
+
+No vendor whitepapers, no exchange research desks, and no project-published token economics documents. Not because they are worthless, but because on this specific subject the incentive to overstate is unusually strong and the primary sources above are sufficient to build a grounded view.
+
+<Card title="Back to the primer" icon="arrow-left" href="/primer/why-corridors-cost-so-much">
+  Or jump to [the architecture](/architecture/overview) with the domain in hand.
+</Card>
